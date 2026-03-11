@@ -1,0 +1,228 @@
+version: "3.9"
+
+# SentinelFraud Docker Compose
+# Stage 8: Full stack - API, PostgreSQL 15, Redis 7, Celery workers
+# Stage 10: Nginx for WebSocket proxy + horizontal scaling
+
+x-app-env: &app-env
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: sentinel_fraud
+  POSTGRES_USER: sentinel
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel_secret}
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_RESULT_BACKEND: redis://redis:6379/2
+  SECRET_KEY: ${SECRET_KEY:-CHANGE_ME_IN_PROD_32chars_minimum!}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:-JWT_SECRET_CHANGE_ME_IN_PROD_32chars}
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  ML_MODEL_PATH: /app/ml_models
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+  # -------------------------------------------------------------------------
+  # PostgreSQL 15
+  # -------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: sentinel-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sentinel_fraud
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel_secret}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel_fraud"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - sentinel-net
+
+  # -------------------------------------------------------------------------
+  # Redis 7
+  # -------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: sentinel-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --loglevel notice
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sentinel-net
+
+  # -------------------------------------------------------------------------
+  # SentinelFraud API (primary)
+  # -------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: sentinel-api
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+    volumes:
+      - ml_models:/app/ml_models
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sentinel-net
+    labels:
+      - "com.sentinel.service=api"
+
+  # -------------------------------------------------------------------------
+  # API Replica 2 (horizontal scaling demo - Stage 10)
+  # -------------------------------------------------------------------------
+  api-replica:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: sentinel-api-replica
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+    volumes:
+      - ml_models:/app/ml_models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sentinel-net
+    profiles:
+      - scaling
+
+  # -------------------------------------------------------------------------
+  # Celery Worker (Stage 6)
+  # -------------------------------------------------------------------------
+  celery-worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: sentinel-celery-worker
+    restart: unless-stopped
+    command: >
+      celery -A app.workers.celery_app worker
+      --loglevel=info
+      --concurrency=4
+      --queues=high_priority,default,low_priority
+      --hostname=worker@%h
+    environment:
+      <<: *app-env
+    volumes:
+      - ml_models:/app/ml_models
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.workers.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - sentinel-net
+
+  # -------------------------------------------------------------------------
+  # Celery Beat Scheduler (periodic tasks)
+  # -------------------------------------------------------------------------
+  celery-beat:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: sentinel-celery-beat
+    restart: unless-stopped
+    command: >
+      celery -A app.workers.celery_app beat
+      --loglevel=info
+      --scheduler celery.beat.PersistentScheduler
+    environment:
+      <<: *app-env
+    volumes:
+      - celery_beat:/app/celerybeat
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - sentinel-net
+
+  # -------------------------------------------------------------------------
+  # Nginx (WebSocket proxy + load balancer - Stage 10)
+  # -------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: sentinel-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/sentinel.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+    networks:
+      - sentinel-net
+    profiles:
+      - production
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  ml_models:
+    driver: local
+  celery_beat:
+    driver: local
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+networks:
+  sentinel-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
