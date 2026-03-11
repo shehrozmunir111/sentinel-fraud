@@ -41,9 +41,10 @@ async def get_alert(alert_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 @router.patch("/{alert_id}", response_model=AlertResponse, dependencies=[require_permission("alerts:write")])
 async def update_alert(alert_id: uuid.UUID, payload: AlertUpdate, db: AsyncSession = Depends(get_db)):
     service = AlertService(db)
+    status_value = payload.status.value if payload.status else None
     alert = await service.resolve_alert(
         alert_id=alert_id,
-        status=payload.status.value if payload.status else None,
+        status=status_value,
         notes=payload.notes,
         assigned_to=payload.assigned_to,
     )

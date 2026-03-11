@@ -98,16 +98,19 @@ class AlertService:
     async def resolve_alert(
         self,
         alert_id: uuid.UUID,
-        status: str,
+        status: Optional[str] = None,
         notes: Optional[str] = None,
         assigned_to: Optional[uuid.UUID] = None,
     ):
-        data = {
-            "status": status,
-            "resolved_at": datetime.now(timezone.utc) if status == "resolved" else None,
-        }
-        if notes:
+        data: dict = {}
+        if status:
+            data["status"] = status
+            if status == "resolved":
+                data["resolved_at"] = datetime.now(timezone.utc)
+        if notes is not None:
             data["notes"] = notes
-        if assigned_to:
+        if assigned_to is not None:
             data["assigned_to"] = assigned_to
+        if not data:
+            return await self.repo.get_by_id(alert_id)
         return await self.repo.update(alert_id, data)

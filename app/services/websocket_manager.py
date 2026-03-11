@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional, Set
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -75,7 +75,7 @@ class WebSocketManager:
         """Broadcast to 'alerts' and 'admin' rooms."""
         message = {
             "event": "fraud_alert",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "data": transaction_data,
         }
         await self.broadcast_to_room("alerts", message)
@@ -85,7 +85,7 @@ class WebSocketManager:
         """Broadcast real-time transaction scoring result."""
         message = {
             "event": "transaction_scored",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "data": transaction_data,
         }
         await self.broadcast_to_room("dashboard", message)
@@ -94,7 +94,7 @@ class WebSocketManager:
     async def broadcast_metrics_update(self, metrics: dict) -> None:
         message = {
             "event": "metrics_update",
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "data": metrics,
         }
         await self.broadcast_to_room("dashboard", message)

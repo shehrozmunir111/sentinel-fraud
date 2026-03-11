@@ -4,7 +4,7 @@ Stage 1: Validation | Stage 5: Pagination, filtering, sorting
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Generic, List, Optional, TypeVar
 
@@ -288,10 +288,11 @@ class FraudRuleResponse(BaseModel):
 class WSMessage(BaseModel):
     event: str
     data: Any
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class FraudAlertWSPayload(BaseModel):
+    alert_id: str
     transaction_id: str
     risk_score: int
     decision: str

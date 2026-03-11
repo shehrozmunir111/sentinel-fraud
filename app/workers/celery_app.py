@@ -103,6 +103,7 @@ def _save_model_to_db(metrics: dict):
         async with Session() as session:
             repo = MLModelRepository(session)
             await repo.deactivate_all()
+            from app.ml.features import FEATURE_NAMES
             await repo.create({
                 "model_name": "fraud_detector",
                 "model_version": metrics["model_version"],
@@ -114,6 +115,7 @@ def _save_model_to_db(metrics: dict):
                 "f1_score": metrics.get("f1"),
                 "auc_roc": metrics.get("auc_roc"),
                 "training_samples": metrics.get("training_samples"),
+                "feature_names": FEATURE_NAMES,
                 "is_active": True,
             })
             await session.commit()

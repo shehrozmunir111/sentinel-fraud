@@ -67,6 +67,7 @@ def upgrade() -> None:
     op.create_index("ix_transactions_decision", "transactions", ["decision"])
     op.create_index("ix_transactions_is_fraud", "transactions", ["is_fraud"])
     op.create_index("ix_transactions_card_id_timestamp", "transactions", ["card_id", "timestamp"])
+    op.create_index("ix_transactions_risk_score", "transactions", ["risk_score"])
 
     # Fraud Rules
     op.create_table(
@@ -104,6 +105,7 @@ def upgrade() -> None:
         sa.Column("trained_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
         sa.UniqueConstraint("model_name", "model_version", name="uq_ml_models_name_version"),
     )
+    op.create_index("ix_ml_models_is_active", "ml_models", ["is_active"])
 
     # Alerts
     op.create_table(

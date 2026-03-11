@@ -3,6 +3,7 @@ SentinelFraud Auth API
 Stage 4: JWT auth, bcrypt, audit logging
 """
 
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -84,7 +85,7 @@ async def refresh_token(payload: RefreshTokenRequest, db: AsyncSession = Depends
         raise HTTPException(status_code=400, detail="Invalid token type")
 
     repo = UserRepository(db)
-    user = await repo.get_by_id(decoded["sub"])
+    user = await repo.get_by_id(uuid.UUID(decoded["sub"]))
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive")
 
@@ -98,7 +99,7 @@ async def refresh_token(payload: RefreshTokenRequest, db: AsyncSession = Depends
 @router.get("/me", response_model=UserResponse)
 async def me(payload: dict = Depends(get_current_user_payload), db: AsyncSession = Depends(get_db)):
     repo = UserRepository(db)
-    user = await repo.get_by_id(payload["sub"])
+    user = await repo.get_by_id(uuid.UUID(payload["sub"]))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user

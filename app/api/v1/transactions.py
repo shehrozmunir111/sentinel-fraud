@@ -20,6 +20,7 @@ from app.database import get_db
 from app.repositories.transaction_repo import TransactionRepository
 from app.repositories import AlertRepository
 from app.schemas import (
+    DashboardStats,
     Decision,
     PagedResponse,
     RiskScoreResult,
@@ -227,6 +228,7 @@ async def get_transaction(
 # ---------------------------------------------------------------------------
 @router.get(
     "/stats/dashboard",
+    response_model=DashboardStats,
     summary="24h fraud statistics",
     dependencies=[require_permission("transactions:read")],
 )
@@ -236,4 +238,5 @@ async def dashboard_stats(db: AsyncSession = Depends(get_db)):
     stats = await tx_repo.get_stats_24h()
     stats["open_alerts"] = await alert_repo.count_open()
     stats["critical_alerts"] = await alert_repo.count_critical()
-    return stats
+    stats["transactions_per_second"] = round(stats["total_transactions_24h"] / 86400, 2)
+    return DashboardStats(**stats)

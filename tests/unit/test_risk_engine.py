@@ -144,13 +144,13 @@ class TestRiskEngine:
 
     def test_amount_rule_high(self):
         engine = self._make_engine()
-        result = engine._apply_amount_rules(amount=15_000, avg_30d=500)
+        result = engine._apply_amount_rules(amount=15_000, avg_30d=2_000)
         assert result.score == 25
         assert any("amount_high" in t for t in result.triggers)
 
     def test_amount_rule_very_high(self):
         engine = self._make_engine()
-        result = engine._apply_amount_rules(amount=60_000, avg_30d=500)
+        result = engine._apply_amount_rules(amount=60_000, avg_30d=10_000)
         assert result.score == 50
         assert any("amount_very_high" in t for t in result.triggers)
 

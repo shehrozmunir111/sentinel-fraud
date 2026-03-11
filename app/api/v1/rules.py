@@ -43,7 +43,10 @@ async def get_rule(rule_id: int, db: AsyncSession = Depends(get_db)):
 @router.patch("/{rule_id}", response_model=FraudRuleResponse, dependencies=[require_permission("rules:write")])
 async def update_rule(rule_id: int, payload: FraudRuleUpdate, db: AsyncSession = Depends(get_db)):
     repo = FraudRuleRepository(db)
-    rule = await repo.update(rule_id, payload.model_dump(exclude_none=True))
+    data = payload.model_dump(exclude_none=True)
+    if "rule_type" in data and hasattr(data["rule_type"], "value"):
+        data["rule_type"] = data["rule_type"].value
+    rule = await repo.update(rule_id, data)
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
     return rule
