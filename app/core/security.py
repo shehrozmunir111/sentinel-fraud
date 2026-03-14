@@ -1,105 +1,49 @@
-"""
-SentinelFraud Security
-Stage 4: JWT auth, RBAC, bcrypt hashing, audit logging, security headers
-"""
-
-import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
-
-import bcrypt
 from jose import JWTError, jwt
+from passlib.context import CryptContext
+from app.core.config import settings
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.config import settings
-
-
-# ---------------------------------------------------------------------------
-# Password hashing  (bcrypt)
-# ---------------------------------------------------------------------------
-def hash_password(plain_password: str) -> str:
-    salt = bcrypt.gensalt(rounds=12)
-    return bcrypt.hashpw(plain_password.encode(), salt).decode()
-
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+security = HTTPBearer()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+    return pwd_context.verify(plain_password, hashed_password)
 
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
 
-# ---------------------------------------------------------------------------
-# JWT token helpers
-# ---------------------------------------------------------------------------
-def create_access_token(subject: str, role: str, extra: Optional[dict] = None) -> str:
-    now = datetime.now(timezone.utc)
-    payload = {
-        "sub": subject,
-        "role": role,
-        "iat": now,
-        "exp": now + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES),
-        "jti": str(uuid.uuid4()),
-        "type": "access",
-        **(extra or {}),
-    }
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
-
-def create_refresh_token(subject: str) -> str:
-    now = datetime.now(timezone.utc)
-    payload = {
-        "sub": subject,
-        "iat": now,
-        "exp": now + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
-        "jti": str(uuid.uuid4()),
-        "type": "refresh",
-    }
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-
-
-def decode_token(token: str) -> dict:
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
     try:
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM],
-        )
-        return payload
-    except JWTError as exc:
-        raise ValueError(f"Invalid token: {exc}") from exc
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id: str = payload.get("sub")
+        role: str = payload.get("role", "analyst")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return {"user_id": user_id, "role": role}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
+class RoleChecker:
+    def __init__(self, allowed_roles: list):
+        self.allowed_roles = allowed_roles
+    
+    def __call__(self, user: dict = Depends(get_current_user)):
+        if user["role"] not in self.allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions"
+            )
+        return user
 
-# ---------------------------------------------------------------------------
-# RBAC helpers
-# ---------------------------------------------------------------------------
-ROLE_PERMISSIONS: dict[str, set[str]] = {
-    "admin": {
-        "transactions:read",
-        "transactions:write",
-        "alerts:read",
-        "alerts:write",
-        "alerts:assign",
-        "users:read",
-        "users:write",
-        "rules:read",
-        "rules:write",
-        "ml:train",
-        "ml:read",
-    },
-    "analyst": {
-        "transactions:read",
-        "alerts:read",
-        "alerts:write",
-        "users:read",
-        "rules:read",
-        "ml:read",
-    },
-    "viewer": {
-        "transactions:read",
-        "alerts:read",
-        "users:read",
-        "rules:read",
-        "ml:read",
-    },
-}
-
-
-def has_permission(role: str, permission: str) -> bool:
-    return permission in ROLE_PERMISSIONS.get(role, set())
+require_admin = RoleChecker(["admin"])
+require_analyst = RoleChecker(["admin", "analyst"])
