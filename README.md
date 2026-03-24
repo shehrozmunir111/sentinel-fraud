@@ -1,104 +1,113 @@
-# SentinelFraud - Real-Time Fraud Detection System
+# 🛡️ SentinelFraud
 
-[![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-green.svg)](https://fastapi.tiangolo.com/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-blue?logo=docker)](https://www.docker.com/)
-[![Redis](https://img.shields.io/badge/Redis-7-red.svg)](https://redis.io/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://www.postgresql.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-v0.111.0-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-v16-336791?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-v7.2-DC382D?logo=redis&logoColor=white)](https://redis.io/)
+[![Python 3.14](https://img.shields.io/badge/Python-3.14-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-SentinelFraud is a production-ready fraud detection system designed for fintech and payments processing. It's capable of handling 10,000+ Transactions Per Second (TPS) with sub-100ms latency using asynchronous processing and machine learning.
+**SentinelFraud** is a high-performance, real-time fraud detection engine designed for modern fintech applications. It leverages asynchronous processing and Machine Learning to detect fraudulent transactions with sub-100ms latency.
 
-## 🚀 Features
+---
 
-- **Real-time Risk Scoring**: Ultra-low latency responses (<100ms) using FastAPI and AsyncIO.
-- **ML-Based Detection**: High accuracy (95%+) using a Random Forest ensemble model.
-- **Dynamic Rule Engine**: Configurable velocity checks, amount limits, and geolocation analysis.
-- **WebSocket Alerts**: Real-time fraud notification system for immediate action.
-- **Horizontal Scalability**: Fully containerized with Docker, optimized for Kubernetes and Docker Swarm.
-- **Monitoring & Observability**: Integrated with Prometheus and Structlog for detailed visibility.
+## 📸 System Showcase
 
-## 🏗️ Architecture
+![SentinelFraud Dashboard/API](assets/endpoints.png)
 
-- **Backend**: FastAPI + Python 3.11
-- **Task Queue**: Celery + Redis (for background scoring and retraining)
-- **Data Store**: PostgreSQL 15 (primary persistence)
-- **Cache**: Redis 7 (velocity tracking and sessions)
-- **ML Stack**: Scikit-learn, Pandas, Joblib
-- **Testing**: Pytest, Locust (load testing)
+---
 
-## 📁 Project Structure
+## ✨ Features
 
-```text
-sentinel-fraud/
-├── app/                # Main application code
-│   ├── api/            # API endpoints (v1)
-│   ├── core/           # Core configuration and security
-│   ├── db/             # Database connection and migrations
-│   ├── models/         # SQLAlchemy models
-│   ├── schemas/        # Pydantic schemas
-│   ├── services/       # Business logic
-│   └── tasks/          # Celery background tasks
-├── docker/             # Docker configuration and init scripts
-├── ml/                 # Machine learning models and training scripts
-├── tests/              # Unit, integration, and load tests
-└── alembic.ini         # Database migration config
-```
+- 🏎️ **Ultra-fast Scoring:** AsyncIO-powered FastAPI backend optimized for high concurrency.
+- 🧠 **ML Intelligence:** Pre-trained Random Forest model for behavioral fraud detection.
+- ⚙️ **Dynamic Rule Engine:** Real-time velocity checks and amount limits (configurable via API).
+- 📡 **Real-time Alerts:** Fraud notifications delivered instantly via WebSockets.
+- 🏗️ **Robust Architecture:** PostgreSQL for persistence, Redis for caching and velocity tracking.
+- 🔐 **Enterprise Security:** JWT-based authentication with role-based access control (RBAC).
 
-## 🛠️ Quick Start
+---
 
-### Prerequisites
-- Docker and Docker Compose
-- Python 3.11+ (for local development)
+## 🏗️ Technical Stack
 
-### Step 1: Environment Setup
+- **Framework:** [FastAPI](https://fastapi.tiangolo.com/)
+- **Database:** [PostgreSQL](https://www.postgresql.org/) with [SQLAlchemy 2.0](https://www.sqlalchemy.org/) (Async)
+- **Cache & Messaging:** [Redis](https://redis.io/)
+- **ML Engine:** [Scikit-learn](https://scikit-learn.org/), [Pandas](https://pandas.pydata.org/)
+- **Authentication:** [Jose JWT](https://python-jose.readthedocs.io/), [Bcrypt](https://pypi.org/project/bcrypt/)
+- **Logging:** [Structlog](https://www.structlog.org/)
+
+---
+
+## 🚀 Quick Setup
+
+### 📦 Docker Support (Recommended)
+SentinelFraud is designed to run seamlessly in Docker.
+
 ```bash
 cp .env.example .env
-# Edit .env with your specific secrets if needed
-```
-
-### Step 2: Spin up Services
-```bash
 docker-compose -f docker/docker-compose.yml up -d
 ```
 
-### Step 3: Run Database Migrations
-```bash
-docker-compose -f docker/docker-compose.yml exec api alembic upgrade head
-```
+### 💻 Local Development
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/sentinel-fraud.git
+   cd sentinel-fraud
+   ```
 
-### Step 4: Verify Installation
-The API will be available at `http://localhost:8000`.
-Check the health status:
-```bash
-curl http://localhost:8000/health
-```
+2. **Initialize Environment:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-## 📖 API Documentation
+3. **Database Configuration:**
+   Ensure PostgreSQL is running and update `DATABASE_URI` in `.env`.
 
-FastAPI provides interactive documentation out of the box:
-- **Swagger UI**: `http://localhost:8000/api/docs`
-- **ReDoc**: `http://localhost:8000/api/redoc`
+4. **Launch Application:**
+   ```bash
+   uvicorn app.main:app --reload
+   ```
+
+---
+
+## 📜 API Documentation
+
+Once the server is running, explore the interactive API through:
+
+- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs) 🚀
+- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc) 📖
+- **Root Info:** [http://localhost:8000/](http://localhost:8000/) 🏠
+
+---
 
 ## 🧪 Testing
 
-### Unit & Integration Tests
-Ensure you have a test database created (`sentinelfraud_test`):
+The system is backed by a comprehensive test suite using **Pytest**.
+
 ```bash
-pytest
+# Set up test database 'sentinelfraud' in PostgreSQL
+python -m pytest tests/ -v
 ```
 
-### Load Testing
-SentinelFraud uses Locust for performance benchmarking:
-```bash
-locust -f tests/load_test.py --host http://localhost:8000
+---
+
+## 📁 Project Overview
+
+```text
+├── app/                  # Enterprise Backend
+│   ├── api/              # Restful Endpoints (v1)
+│   ├── core/             # Config, Security, Logging, Middleware
+│   ├── models/           # DB Schemas (SQLAlchemy)
+│   ├── schemas/          # Data Validation (Pydantic)
+│   └── services/         # Rule Engine & Business Logic
+├── ml/                   # ML Training & Prediction
+├── tests/                # Integration & Unit Tests
+└── docker/               # Container Orchestration
 ```
 
-## 🧠 Machine Learning
+---
 
-To train the fraud detection model:
-1. Ensure you have the dataset in `ml/data/creditcard.csv`.
-2. Run the training script:
-```bash
-python ml/training.py
-```
-The model will be saved to `ml/models/fraud_model_v1.pkl`.
+## ⚖️ License
+Distributed under the MIT License. See `LICENSE` for more information.

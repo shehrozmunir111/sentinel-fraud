@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import DbDep
+from app.api.deps import DbDep, CurrentUser
 from app.schemas.user import UserCreate, UserResponse, Token
 from app.repositories.user import UserRepository
 from app.core.security import verify_password, create_access_token, get_password_hash
@@ -50,10 +50,12 @@ async def login(
     
     return {"access_token": access_token, "token_type": "bearer"}
 
+from uuid import UUID
+
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(current_user: CurrentUser, db: DbDep = None):
     repo = UserRepository(db)
-    user = await repo.get_by_id(current_user["user_id"])
+    user = await repo.get_by_id(UUID(str(current_user["user_id"])))
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user

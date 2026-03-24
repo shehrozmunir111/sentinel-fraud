@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
+from uuid import UUID
 from app.models.fraud_rule import RuleType
 
 class FraudRuleBase(BaseModel):
@@ -15,7 +16,7 @@ class FraudRuleCreate(FraudRuleBase):
     pass
 
 class FraudRuleResponse(FraudRuleBase):
-    id: int
+    id: UUID
     created_at: datetime
     updated_at: Optional[datetime]
     

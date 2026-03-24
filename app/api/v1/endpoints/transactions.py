@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import List, Optional
-from sqlalchemy import select, desc, asc
+from sqlalchemy import select, desc, asc, func
 from datetime import datetime
 
 from app.api.deps import DbDep, CurrentUser
@@ -25,7 +25,20 @@ async def assess_transaction(
     tx_data = transaction.model_dump()
     tx_data['user_id'] = transaction.user_id
     
+    repo = TransactionRepository(db)
+    
     risk_score, decision, details = await risk_engine.calculate_risk_score(tx_data)
+    
+    # Persist the transaction
+    tx_record = tx_data.copy()
+    tx_record.update({
+        "risk_score": risk_score,
+        "decision": decision,
+        "is_fraud": decision == "decline",
+        "ml_score": details['ml_score'],
+        "rule_scores": details['rule_contributions']
+    })
+    await repo.create(tx_record)
     
     if decision in ["decline", "review"]:
         alert_service = AlertService(db)
@@ -80,7 +93,7 @@ async def list_transactions(
     else:
         query = query.order_by(asc(sort_column))
     
-    total = await db.scalar(select(Transaction.id).count())
+    total = await db.scalar(select(func.count(Transaction.id)))
     offset = (page - 1) * limit
     query = query.offset(offset).limit(limit)
     

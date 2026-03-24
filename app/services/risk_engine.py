@@ -8,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 import asyncio
 
+from uuid import UUID
+
 class RiskEngineService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -18,6 +20,10 @@ class RiskEngineService:
     
     async def calculate_risk_score(self, transaction_data: dict) -> Tuple[int, str, Dict]:
         start_time = datetime.utcnow()
+        
+        # Ensure user_id is UUID
+        if 'user_id' in transaction_data and not isinstance(transaction_data['user_id'], UUID):
+            transaction_data['user_id'] = UUID(str(transaction_data['user_id']))
         
         velocity_task = self._check_velocity(transaction_data)
         amount_task = self._check_amount_rules(transaction_data)

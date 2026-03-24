@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import List, Optional
+from uuid import UUID
 
 from app.api.deps import DbDep, CurrentUser, require_admin
 from app.schemas.fraud_rule import FraudRuleCreate, FraudRuleResponse
@@ -60,7 +61,7 @@ async def get_active_rules(db: DbDep):
 
 @router.put("/{rule_id}", response_model=FraudRuleResponse, dependencies=[Depends(require_admin)])
 async def update_rule(
-    rule_id: int,
+    rule_id: UUID,
     rule_in: FraudRuleCreate,
     db: DbDep
 ):
@@ -71,7 +72,7 @@ async def update_rule(
     return updated
 
 @router.delete("/{rule_id}", dependencies=[Depends(require_admin)])
-async def delete_rule(rule_id: int, db: DbDep):
+async def delete_rule(rule_id: UUID, db: DbDep):
     repo = FraudRuleRepository(db)
     deleted = await repo.delete(rule_id)
     if not deleted:
