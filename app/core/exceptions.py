@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from fastapi.responses import JSONResponse
 from typing import Any, Dict, Optional
 
 class SentinelException(Exception):
@@ -29,9 +30,12 @@ class AuthorizationException(HTTPException):
         )
 
 async def sentinel_exception_handler(request, exc: SentinelException):
-    return {
-        "error": True,
-        "message": exc.message,
-        "status_code": exc.status_code,
-        "details": exc.details
-    }
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": True,
+            "message": exc.message,
+            "status_code": exc.status_code,
+            "details": exc.details
+        },
+    )

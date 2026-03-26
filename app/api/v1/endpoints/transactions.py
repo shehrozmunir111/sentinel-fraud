@@ -8,7 +8,6 @@ from app.schemas.transaction import TransactionCreate, TransactionResponse, Risk
 from app.schemas.base import PaginatedResponse
 from app.services.risk_engine import RiskEngineService
 from app.services.alert import AlertService
-from app.services.websocket import websocket_manager
 from app.models.transaction import Transaction
 from app.repositories.transaction import TransactionRepository
 
@@ -48,14 +47,6 @@ async def assess_transaction(
             severity="high" if decision == "decline" else "medium",
             description=f"Risk score: {risk_score}, ML: {details['ml_score']:.2f}"
         )
-        
-        await websocket_manager.broadcast_fraud_alert({
-            "transaction_id": transaction.transaction_id,
-            "risk_score": risk_score,
-            "decision": decision,
-            "amount": str(transaction.amount),
-            "merchant": transaction.merchant_id
-        })
     
     return RiskAssessmentResponse(
         transaction_id=transaction.transaction_id,
@@ -79,13 +70,17 @@ async def list_transactions(
     user_id: Optional[str] = None
 ):
     query = select(Transaction)
+    count_query = select(func.count(Transaction.id))
     
     if decision:
         query = query.where(Transaction.decision == decision)
+        count_query = count_query.where(Transaction.decision == decision)
     if min_amount:
         query = query.where(Transaction.amount >= min_amount)
+        count_query = count_query.where(Transaction.amount >= min_amount)
     if user_id:
         query = query.where(Transaction.user_id == user_id)
+        count_query = count_query.where(Transaction.user_id == user_id)
     
     sort_column = getattr(Transaction, sort_by, Transaction.created_at)
     if sort_order == "desc":
@@ -93,7 +88,7 @@ async def list_transactions(
     else:
         query = query.order_by(asc(sort_column))
     
-    total = await db.scalar(select(func.count(Transaction.id)))
+    total = await db.scalar(count_query)
     offset = (page - 1) * limit
     query = query.offset(offset).limit(limit)
     

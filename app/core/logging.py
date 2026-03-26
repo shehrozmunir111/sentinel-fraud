@@ -2,6 +2,8 @@ import structlog
 import logging
 import sys
 
+from app.core.config import settings
+
 def configure_logging():
     structlog.configure(
         processors=[
@@ -24,5 +26,5 @@ def configure_logging():
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,
-        level=logging.INFO,
+        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
     )

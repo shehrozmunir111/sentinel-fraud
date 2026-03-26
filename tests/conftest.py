@@ -16,7 +16,13 @@ from app.db.base import Base, engine, get_db
 from app.core.config import settings
 from app.core.security import create_access_token
 
-# ─── Database ───
+@pytest.fixture(scope="session")
+def event_loop():
+    """Provide a session-scoped loop for pytest-asyncio strict mode."""
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_db():
     """Wipe and recreate database tables once per session."""
@@ -65,6 +71,8 @@ def mock_redis(monkeypatch):
     mock_redis_client.pipeline.return_value = mock_pipeline
     mock_redis_client.get = AsyncMock(return_value=None)
     mock_redis_client.setex = AsyncMock(return_value=True)
+    mock_redis_client.ping = AsyncMock(return_value=True)
+    mock_redis_client.aclose = AsyncMock(return_value=None)
     monkeypatch.setattr("redis.asyncio.Redis", lambda **kwargs: mock_redis_client)
     return mock_redis_client
 

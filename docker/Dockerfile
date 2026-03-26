@@ -27,7 +27,7 @@ RUN chown -R sentinel:sentinel /app
 USER sentinel
 
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+    CMD python -c "from urllib.request import urlopen; urlopen('http://localhost:8000/health')"
 
 EXPOSE 8000
 

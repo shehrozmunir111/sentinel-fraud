@@ -42,8 +42,16 @@ async def list_rules(
         items = await repo.get_by_type(rule_type)
     else:
         items = await repo.get_all(skip=(page-1)*limit, limit=limit)
+
+    if is_active is not None:
+        items = [item for item in items if item.is_active == is_active]
     
-    total = await repo.count()
+    if rule_type or is_active is not None:
+        total = len(items)
+        start = (page - 1) * limit
+        items = items[start:start + limit]
+    else:
+        total = await repo.count()
     
     return PaginatedResponse(
         items=items,

@@ -1,4 +1,4 @@
-from fastapi import Request, Response
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 import time
 import structlog
@@ -26,11 +26,24 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         start_time = time.time()
         client_ip = request.client.host if request.client else "unknown"
         user_agent = request.headers.get("user-agent", "unknown")
-        
-        response = await call_next(request)
-        
+
+        try:
+            response = await call_next(request)
+        except Exception:
+            process_time = time.time() - start_time
+            logger.exception(
+                "request_audit_error",
+                method=request.method,
+                path=request.url.path,
+                client_ip=client_ip,
+                user_agent=user_agent,
+                duration=process_time,
+                user_id=getattr(request.state, "user_id", None)
+            )
+            raise
+
         process_time = time.time() - start_time
-        
+
         logger.info(
             "request_audit",
             method=request.method,
@@ -41,5 +54,5 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
             duration=process_time,
             user_id=getattr(request.state, "user_id", None)
         )
-        
+
         return response

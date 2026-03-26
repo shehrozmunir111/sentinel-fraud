@@ -60,7 +60,10 @@ async def assign_alert(
     db: DbDep
 ):
     service = AlertService(db)
-    result = await service.assign_alert(alert_id, user_id)
+    try:
+        await service.assign_alert(alert_id, user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     
     repo = AlertRepository(db)
     alert = await repo.get_by_id(alert_id)
@@ -75,11 +78,14 @@ async def resolve_alert(
     service = AlertService(db)
     
     is_fp = update_data.status == AlertStatus.FALSE_POSITIVE
-    await service.resolve_alert(
-        alert_id, 
-        update_data.resolution_notes or "",
-        is_false_positive=is_fp
-    )
+    try:
+        await service.resolve_alert(
+            alert_id,
+            update_data.resolution_notes or "",
+            is_false_positive=is_fp
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     
     repo = AlertRepository(db)
     alert = await repo.get_by_id(alert_id)

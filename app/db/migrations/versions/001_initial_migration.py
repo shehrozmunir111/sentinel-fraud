@@ -10,6 +10,7 @@ from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
+import uuid
 
 revision: str = '001'
 down_revision: Union[str, None] = None
@@ -19,7 +20,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     op.create_table('fraud_rules',
-        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, default=uuid.uuid4),
         sa.Column('rule_name', sa.String(length=100), nullable=False),
         sa.Column('rule_type', sa.Enum('VELOCITY', 'AMOUNT', 'GEOLOCATION', 'DEVICE', name='ruletype'), nullable=False),
         sa.Column('conditions', sa.JSON(), nullable=False),
@@ -33,7 +34,7 @@ def upgrade() -> None:
     )
     
     op.create_table('ml_models',
-        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False, default=uuid.uuid4),
         sa.Column('model_name', sa.String(length=100), nullable=False),
         sa.Column('model_version', sa.String(length=20), nullable=False),
         sa.Column('model_path', sa.String(length=500), nullable=False),

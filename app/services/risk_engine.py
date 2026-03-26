@@ -1,11 +1,11 @@
-from typing import Dict, List, Tuple
-from datetime import datetime, timedelta
+from typing import Any, Dict, Tuple
+from datetime import datetime
 from app.services.velocity import VelocityCheckService
 from app.services.ml_model import MLModelService
 from app.repositories.transaction import TransactionRepository
 from app.repositories.fraud_rule import FraudRuleRepository
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.config import settings
+from app.models.fraud_rule import RuleType
 import asyncio
 
 from uuid import UUID
@@ -52,6 +52,10 @@ class RiskEngineService:
             geo_score, geo_details = results[2]
             total_score += geo_score
             rule_contributions.update(geo_details)
+
+        dynamic_score, dynamic_details = await self._check_dynamic_rules(transaction_data)
+        total_score += dynamic_score
+        rule_contributions.update(dynamic_details)
         
         ml_score = 0.0
         if not isinstance(results[3], Exception):
@@ -139,6 +143,77 @@ class RiskEngineService:
             return await self.ml_service.predict(features)
         except Exception:
             return 0.0
+
+    async def _check_dynamic_rules(self, tx: dict) -> Tuple[int, Dict[str, int]]:
+        scores: Dict[str, int] = {}
+        active_rules = await self.rule_repo.get_active_rules()
+
+        for rule in active_rules:
+            if await self._rule_matches(rule.rule_type, rule.conditions or {}, tx):
+                scores[f"rule:{rule.rule_name}"] = rule.risk_weight
+
+        return sum(scores.values()), scores
+
+    async def _rule_matches(self, rule_type: RuleType, conditions: Dict[str, Any], tx: dict) -> bool:
+        amount = float(tx["amount"])
+        currency = tx.get("currency")
+        country_code = tx.get("country_code")
+        device_fingerprint = tx.get("device_fingerprint")
+
+        if rule_type == RuleType.AMOUNT:
+            min_amount = conditions.get("min_amount")
+            max_amount = conditions.get("max_amount")
+            required_currency = conditions.get("currency")
+            if min_amount is not None and amount < float(min_amount):
+                return False
+            if max_amount is not None and amount <= float(max_amount):
+                return False
+            if required_currency and currency != required_currency:
+                return False
+            return True
+
+        if rule_type == RuleType.GEOLOCATION:
+            countries = conditions.get("country_codes") or conditions.get("countries")
+            blocked_country = conditions.get("country_code")
+            cities = conditions.get("cities")
+            if countries and country_code not in countries:
+                return False
+            if blocked_country and country_code != blocked_country:
+                return False
+            if cities and tx.get("city") not in cities:
+                return False
+            return True
+
+        if rule_type == RuleType.DEVICE:
+            required_device = conditions.get("device_fingerprint")
+            allow_missing = conditions.get("match_missing_device", False)
+            if required_device:
+                return device_fingerprint == required_device
+            if allow_missing:
+                return not device_fingerprint
+            return bool(device_fingerprint)
+
+        if rule_type == RuleType.VELOCITY:
+            return await self._matches_velocity_rule(conditions, tx)
+
+        return False
+
+    async def _matches_velocity_rule(self, conditions: Dict[str, Any], tx: dict) -> bool:
+        window_hours = int(conditions.get("window_hours", 1))
+        entity = conditions.get("entity", "user")
+        threshold = int(conditions.get("threshold", 0))
+        if threshold <= 0:
+            return False
+
+        # Use persisted history rather than incrementing Redis counters again.
+        if entity == "card":
+            query_id = tx["card_id"]
+            transactions = await self.tx_repo.get_card_transactions_last_hours(query_id, window_hours)
+        else:
+            query_id = str(tx["user_id"])
+            transactions = await self.tx_repo.get_user_transactions_last_hours(query_id, window_hours)
+
+        return len(transactions) >= threshold
     
     def _make_decision(self, total_score: int, ml_score: float) -> str:
         if total_score >= 80 or ml_score > 0.9:

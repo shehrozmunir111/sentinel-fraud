@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, Dict
 from decimal import Decimal
 from datetime import datetime
@@ -43,8 +43,7 @@ class TransactionResponse(TransactionBase):
     ml_score: Optional[Decimal]
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class RiskAssessmentResponse(BaseModel):
     transaction_id: str

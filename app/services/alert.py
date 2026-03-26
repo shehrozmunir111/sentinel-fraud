@@ -4,6 +4,7 @@ from app.models.alert import AlertSeverity, AlertStatus
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from uuid import UUID
+from datetime import datetime
 from app.services.websocket import websocket_manager
 
 class AlertService:
@@ -56,14 +57,19 @@ class AlertService:
         updated = await self.alert_repo.update(alert_id, {
             "assigned_to": user_id
         })
+        if not updated:
+            raise ValueError(f"Alert {alert_id} not found")
         return {"id": str(alert_id), "assigned_to": str(user_id), "status": "assigned"}
-    
+
     async def resolve_alert(self, alert_id: UUID, notes: str, is_false_positive: bool = False) -> dict:
         status = AlertStatus.FALSE_POSITIVE if is_false_positive else AlertStatus.RESOLVED
         updated = await self.alert_repo.update(alert_id, {
             "status": status,
-            "resolution_notes": notes
+            "resolution_notes": notes,
+            "resolved_at": datetime.utcnow(),
         })
+        if not updated:
+            raise ValueError(f"Alert {alert_id} not found")
         return {"id": str(alert_id), "status": status.value, "resolved": True}
     
     async def notify_dashboard(self, message: dict):
